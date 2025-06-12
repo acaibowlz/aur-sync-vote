@@ -1,0 +1,15 @@
+Metadata-Version: 2.4
+Name: aur-sync-vote
+Version: 0.1.0
+Summary: Add your description here
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: beautifulsoup4>=4.13.4
+Requires-Dist: html5lib>=1.1
+Requires-Dist: requests>=2.32.4
+Dynamic: license-file
+
+# aur-sync-vote
+
+This is a fork of [aur-auto-vote](https://github.com/cryzed/bin/blob/master/aur-auto-vote), with the focus of syncing votes to currently install AUR packages.
