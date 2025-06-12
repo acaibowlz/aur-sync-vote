@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import argparse
 import collections
 import os
@@ -14,18 +12,13 @@ import requests
 EXIT_FAILURE = 1
 LOGIN_URL = 'https://aur.archlinux.org/login'
 SEARCH_URL_TEMPLATE = 'https://aur.archlinux.org/packages/?O=%d&SB=w&SO=d&PP=250&do_Search=Go'
-PACKAGES_URL = 'https://aur.archlinux.org/packages/'
+PACKAGES_URL = 'https://aur.archlinux.org/packages/%s'
 VOTE_URL_TEMPLATE = 'https://aur.archlinux.org/pkgbase/%s/vote/'
 UNVOTE_URL_TEMPLATE = 'https://aur.archlinux.org/pkgbase/%s/unvote/'
 PACKAGES_PER_PAGE = 250
 
 argument_parser = argparse.ArgumentParser()
-argument_parser.add_argument('username')
-argument_parser.add_argument('--ignore', '-i', action='append', default=[],
-                             help='Regex for packages that should not be voted. Can be passed multiple times.')
-argument_parser.add_argument('--unvote-all', '-u', action='store_true',
-                             help='Unvote all voted-for packages, all other arguments are ignored.')
-argument_parser.add_argument('--no-unvote', '-n', action="store_true", help="Don't unvote uninstalled packages.")
+argument_parser.add_argument("--explicit", "-e", action="store_true", help="Sync votes for explicitly installed packages only")
 argument_parser.add_argument('--delay', '-d', type=float, default=0, help='Delay between voting actions (seconds).')
 
 Package = collections.namedtuple(
@@ -38,8 +31,10 @@ def login(session, username, password):
     return bool(soup.select_one('#archdev-navbar').find('form', action=lambda h: h and h.rstrip('/').endswith('/logout')))
 
 
-def get_foreign_packages():
-    return subprocess.check_output(('pacman', '-Qmq'), universal_newlines=True).splitlines()
+def get_foreign_packages(explicit_installed: bool = False) -> list[str]:
+    if explicit_installed:
+        return subprocess.check_output(('pacman', '-Qqme'), universal_newlines=True).splitlines()
+    return subprocess.check_output(('pacman', '-Qqm'), universal_newlines=True).splitlines()
 
 
 def get_voted_packages(session):
@@ -52,15 +47,36 @@ def get_voted_packages(session):
             package = Package(*(c.get_text(strip=True) for c in row.select(':scope > td')[1:]))
             if not package.voted:
                 return
-
             yield package
 
         offset += PACKAGES_PER_PAGE
 
+def get_package_base(session, package):
+    response = session.get(PACKAGES_URL % package)
+    soup = bs4.BeautifulSoup(response.text, 'html5lib')
+
+    table = soup.find('table', {'id': 'pkginfo'})
+    if not table:
+        return None
+
+    for row in table.find_all('tr'):
+        header = row.find('th')
+        if header and header.text.strip() == "Package Base:":
+            td = row.find('td')
+            if td:
+                return td.text.strip()
+    return None
+
+def is_split_package(session, package):
+    base_package = get_package_base(session, package)
+    if base_package != package:
+        return True
+    return False
+
 
 def vote_package(session, package):
     response = session.post(VOTE_URL_TEMPLATE % package, {'do_Vote': 'Vote for this package'},
-                            allow_redirects=True)                          
+                            allow_redirects=True)
     return response.status_code == requests.codes.ok
 
 
@@ -70,35 +86,22 @@ def unvote_package(session, package):
     return response.status_code == requests.codes.ok
 
 
-# TODO: Handle split packages better
 def main(arguments):
+    username = input("Username: ")
     password = os.environ.get('AUR_AUTO_VOTE_PASSWORD') or getpass.getpass('Password: ')
-    ignores = tuple(re.compile(r) for r in arguments.ignore)
     session = requests.Session()
-    if not login(session, arguments.username, password):
+    if not login(session, username, password):
         argument_parser.exit(EXIT_FAILURE, 'Could not login.\n')
 
+    print("Collecting voted packages...")
     voted_packages = tuple(p.name for p in sorted(get_voted_packages(session)))
 
-    # Unvote all packages and return immediately if --unvote-all was passed
-    if arguments.unvote_all:
-        for package in voted_packages:
-            print('Unvoting package: %s... ' % package, end='', flush=True)
-            if unvote_package(session, package):
-                print('done.')
-            else:
-                print('failed.')
-            time.sleep(arguments.delay)
-
-        return
-
-    foreign_packages = set(get_foreign_packages())
+    if arguments.explicit:
+        foreign_packages = set(get_foreign_packages(explicit_installed=True))
+    else:
+        foreign_packages = set(get_foreign_packages())
     voted_packages = set(voted_packages)
     for package in sorted(foreign_packages.difference(voted_packages)):
-        if any(i.match(package) for i in ignores):
-            print('Not voting for ignored package:', package)
-            continue
-
         print('Voting for package: %s... ' % package, end='', flush=True)
         if vote_package(session, package):
             print('done.')
@@ -106,16 +109,9 @@ def main(arguments):
             print('failed.')
         time.sleep(arguments.delay)
 
-    # Unvote packages that are voted for in the AUR but not available on the system anymore, i.e. uninstalled since the
-    # last voting
-    if arguments.no_unvote:
-        return
-
     for package in sorted(voted_packages.difference(foreign_packages)):
-        if any(i.match(package) for i in ignores):
-            print('Not unvoting ignored package:', package)
+        if is_split_package(session, package):
             continue
-
         print('Unvoting removed package: %s... ' % package, end='', flush=True)
         if unvote_package(session, package):
             print('done.')
