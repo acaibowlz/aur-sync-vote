@@ -1,7 +1,7 @@
 [project]
 name = "aur-sync-vote"
 version = "0.1.0"
-description = "Add your description here"
+description = "Automates voting on installed and uninstalled AUR packages"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = ["beautifulsoup4>=4.13.4", "html5lib>=1.1", "requests>=2.32.4"]
@@ -19,6 +19,4 @@ where = ["src"]
 line-length = 100
 
 [dependency-groups]
-dev = [
-    "ruff>=0.11.13",
-]
+dev = ["ruff>=0.11.13"]
