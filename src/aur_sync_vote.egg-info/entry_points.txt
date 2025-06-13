@@ -1,2 +1,0 @@
-[console_scripts]
-aur-sync-vote = aur_sync_vote.main:main
