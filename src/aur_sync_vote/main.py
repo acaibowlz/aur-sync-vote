@@ -1,11 +1,14 @@
 import argparse
 import collections
 import getpass
+import os
 import subprocess
 import time
+from pathlib import Path
 
 import bs4
 import requests
+from typing_extensions import Set
 
 EXIT_FAILURE = 1
 LOGIN_URL = "https://aur.archlinux.org/login"
@@ -14,6 +17,8 @@ PACKAGES_URL = "https://aur.archlinux.org/packages/%s"
 VOTE_URL_TEMPLATE = "https://aur.archlinux.org/pkgbase/%s/vote/"
 UNVOTE_URL_TEMPLATE = "https://aur.archlinux.org/pkgbase/%s/unvote/"
 PACKAGES_PER_PAGE = 250
+XDG_DATA_HOME = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
+CREDS_FILE = XDG_DATA_HOME / "aur-sync-vote" / "credentials"
 
 Package = collections.namedtuple(
     "Package",
@@ -29,6 +34,29 @@ Package = collections.namedtuple(
         "updated",
     ),
 )
+
+
+def validate_stored_credentials():
+    try:
+        with open(CREDS_FILE, "r") as f:
+            return len(f.read().splitlines()) == 2
+    except FileNotFoundError:
+        return False
+
+
+def load_credentials():
+    with open(CREDS_FILE, "r") as f:
+        username, password = f.read().splitlines()
+        return username, password
+
+
+def save_credentials(username, password):
+    if not CREDS_FILE.parent.exists():
+        CREDS_FILE.parent.mkdir(parents=True)
+    if not CREDS_FILE.exists():
+        CREDS_FILE.touch()
+    with open(CREDS_FILE, "w") as f:
+        f.write(f"{username}\n{password}")
 
 
 def login(session, username, password):
@@ -98,7 +126,7 @@ def unvote_package(session, package):
     return response.status_code == requests.codes.ok
 
 
-def main():
+def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--explicit",
@@ -113,14 +141,20 @@ def main():
         default=0,
         help="Delay between voting actions (seconds).",
     )
+    parser.add_argument("--remember", "-r", action="store_true", help="Remember login credentials")
     arguments = parser.parse_args()
 
-    username = input("Username: ")
-    password = getpass.getpass("Password: ")
+    if validate_stored_credentials():
+        username, password = load_credentials()
+    else:
+        username = input("Username: ")
+        password = getpass.getpass("Password: ")
+    if arguments.remember:
+        save_credentials(username, password)
+
     session = requests.Session()
     if not login(session, username, password):
-        parser.exit(EXIT_FAILURE, "Could not login.\n")
-
+        raise SystemExit("Could not login.")
     print("Collecting voted packages...")
     voted_packages = tuple(p.name for p in sorted(get_voted_packages(session)))
 
@@ -147,3 +181,13 @@ def main():
         else:
             print("failed.")
         time.sleep(arguments.delay)
+    print("Sync done!")
+
+
+def main():
+    try:
+        cli()
+    except KeyboardInterrupt:
+        raise SystemExit("\nInterrupted!")
+    except Exception as e:
+        raise SystemExit(f"Unexpected error: {e}")
