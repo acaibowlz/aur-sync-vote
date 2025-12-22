@@ -4,7 +4,12 @@ version = "0.1.0"
 description = "Automates voting on installed and uninstalled AUR packages"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["beautifulsoup4>=4.13.4", "html5lib>=1.1", "requests>=2.32.4"]
+dependencies = [
+    "beautifulsoup4>=4.13.4",
+    "html5lib>=1.1",
+    "keyring>=25.7.0",
+    "requests>=2.32.4",
+]
 
 [project.scripts]
 aur-sync-vote = "aur_sync_vote.main:main"

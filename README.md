@@ -1,10 +1,10 @@
 # aur-sync-vote
 
-This is a fork of [aur-auto-vote](https://github.com/cryzed/bin/blob/master/aur-auto-vote), with the focus of syncing votes to currently install AUR packages.
+This is a fork of [aur-auto-vote](https://github.com/cryzed/bin/blob/master/aur-auto-vote), with the focus of syncing votes to currently installed AUR packages.
 
 While dropping the redundant options from the original script, `aur-sync-vote` implemented a new feature that lets you decide to sync all the AUR packages or the ones that are explicitly installed only.
 
-Beside that, `aur-sync-vote` also handled split packages better, as it will vote for the correct package base and will not attempt to unvote a split package that is not installed.
+Beside that, `aur-sync-vote` also handles split packages better, as it will vote for the correct package base and will not attempt to unvote a split package that is not installed.
 
 ## Usage
 
