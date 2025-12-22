@@ -89,52 +89,50 @@ def login(session: requests.Session, username: str, password: str):
     )
 
 
-def get_installed_packages(explicitly_installed: bool = False) -> list[str]:
+def get_foreign_pkgs(explicitly_installed: bool = False) -> list[str]:
     if explicitly_installed:
         return subprocess.check_output(("pacman", "-Qqme"), universal_newlines=True).splitlines()
     return subprocess.check_output(("pacman", "-Qqm"), universal_newlines=True).splitlines()
 
 
-def get_voted_packages(session):
+def get_voted_pkgs(session):
     offset = 0
     while True:
         response = session.get(SEARCH_URL_TEMPLATE % offset)
         soup = bs4.BeautifulSoup(response.text, "html5lib")
         for row in soup.select(".results > tbody > tr"):
-            package = Package(*(c.get_text(strip=True) for c in row.select(":scope > td")[1:]))
-            if not package.voted:
+            pkg = Package(*(c.get_text(strip=True) for c in row.select(":scope > td")[1:]))
+            if not pkg.voted:
                 return
-            yield package
+            yield pkg
         offset += PACKAGES_PER_PAGE
 
 
-def get_pkgbase(session: requests.Session, package: str) -> str:
-    response = session.get(PACKAGES_URL % package)
+def get_pkgbase(session: requests.Session, pkg: str) -> str:
+    response = session.get(PACKAGES_URL % pkg)
     soup = bs4.BeautifulSoup(response.text, "html5lib")
 
     table = soup.find("table", {"id": "pkginfo"})
     if not table:
-        raise RuntimeError(f"pkginfo table not found for {package}")
+        raise RuntimeError(f"pkginfo table not found for {pkg}")
     for row in table.find_all("tr"):
         header = row.find("th")
         if header and header.text.strip() == "Package Base:":
             td = row.find("td")
             if td:
                 return td.text.strip()
-    raise RuntimeError(f"pkgbase not found for {package}")
+    raise RuntimeError(f"pkgbase not found for {pkg}")
 
 
-def vote_package(session: requests.Session, package: str) -> bool:
+def vote_pkg(session: requests.Session, pkg: str) -> bool:
     response = session.post(
-        VOTE_URL_TEMPLATE % package, {"do_Vote": "Vote for this package"}, allow_redirects=True, timeout=30
+        VOTE_URL_TEMPLATE % pkg, {"do_Vote": "Vote for this package"}, allow_redirects=True, timeout=30
     )
     return response.status_code == requests.codes.ok
 
 
-def unvote_package(session: requests.Session, package: str) -> bool:
-    response = session.post(
-        UNVOTE_URL_TEMPLATE % package, {"do_UnVote": "Remove vote"}, allow_redirects=True, timeout=30
-    )
+def unvote_pkg(session: requests.Session, pkg: str) -> bool:
+    response = session.post(UNVOTE_URL_TEMPLATE % pkg, {"do_UnVote": "Remove vote"}, allow_redirects=True, timeout=30)
     return response.status_code == requests.codes.ok
 
 
@@ -164,7 +162,7 @@ def cli():
         sys.exit(1)
     if args.clear:
         if not credentials_exist():
-            print("⚠️ No saved credentials found")
+            print("⚠️  No saved credentials found")
             sys.exit(0)
         clear_credentials()
         print("✅ Credentials cleared")
@@ -184,26 +182,26 @@ def cli():
         print("❌ Could not login")
         sys.exit(1)
     print("ℹ️  Collecting voted packages...")
-    voted_packages = set(p.name for p in get_voted_packages(session))
+    voted_pkgs = set(p.name for p in get_voted_pkgs(session))
 
     if args.explicit:
-        foreign_packages = set(get_installed_packages(explicitly_installed=True))
+        foreign_pkgs = set(get_foreign_pkgs(explicitly_installed=True))
     else:
-        foreign_packages = set(get_installed_packages())
-    for package in sorted(foreign_packages.difference(voted_packages)):
-        print("🗳️ Voting for package: %s... " % package, end="", flush=True)
-        package_base = get_pkgbase(session, package)
-        if vote_package(session, package_base):
+        foreign_pkgs = set(get_foreign_pkgs())
+    for pkg in sorted(foreign_pkgs.difference(voted_pkgs)):
+        print("🗳️  Voting for package: %s... " % pkg, end="", flush=True)
+        pkgbase = get_pkgbase(session, pkg)
+        if vote_pkg(session, pkgbase):
             print("✅ done")
         else:
             print("❌ failed")
         time.sleep(args.delay)
-    for package in sorted(voted_packages.difference(foreign_packages)):
-        package_base = get_pkgbase(session, package)
-        if package_base in foreign_packages:
+    for pkg in sorted(voted_pkgs.difference(foreign_pkgs)):
+        pkgbase = get_pkgbase(session, pkg)
+        if pkgbase in foreign_pkgs:
             continue
-        print("🗳️ Unvoting for package: %s... " % package, end="", flush=True)
-        if unvote_package(session, package_base):
+        print("🗳️  Unvoting for package: %s... " % pkg, end="", flush=True)
+        if unvote_pkg(session, pkgbase):
             print("✅ done")
         else:
             print("❌ failed")
