@@ -20,6 +20,14 @@ UNVOTE_URL_TEMPLATE = "https://aur.archlinux.org/pkgbase/%s/unvote"
 PACKAGES_PER_PAGE = 250
 
 
+class PackageNotFoundError(Exception):
+    pass
+
+
+class AURPageContentError(Exception):
+    pass
+
+
 @dataclass
 class Package:
     name: str
@@ -112,16 +120,20 @@ def get_pkgbase(session: requests.Session, pkg: str) -> str:
     response = session.get(PACKAGES_URL % pkg)
     soup = bs4.BeautifulSoup(response.text, "html5lib")
 
+    error_page = soup.find("div", {"id": "error-page"})
+    if error_page:
+        raise PackageNotFoundError(f"Package not found in AUR: {pkg}")
+
     table = soup.find("table", {"id": "pkginfo"})
-    if not table:
-        raise RuntimeError(f"pkginfo table not found for {pkg}")
+    if table is None:
+        raise AURPageContentError(f"pkginfo table not found for {pkg}")
     for row in table.find_all("tr"):
         header = row.find("th")
         if header and header.text.strip() == "Package Base:":
             td = row.find("td")
             if td:
                 return td.text.strip()
-    raise RuntimeError(f"pkgbase not found for {pkg}")
+    raise AURPageContentError(f"pkgbase not shown in pkginfo table for {pkg}")
 
 
 def vote_pkg(session: requests.Session, pkg: str) -> bool:
@@ -190,13 +202,18 @@ def cli():
         foreign_pkgs = set(get_foreign_pkgs())
     for pkg in sorted(foreign_pkgs.difference(voted_pkgs)):
         print("🗳️  Voting for package: %s... " % pkg, end="", flush=True)
-        pkgbase = get_pkgbase(session, pkg)
+        try:
+            pkgbase = get_pkgbase(session, pkg)
+        except PackageNotFoundError:
+            print("⚠️ not found in AUR, skipping")
+            continue
         if vote_pkg(session, pkgbase):
             print("✅ done")
         else:
             print("❌ failed")
         time.sleep(args.delay)
     for pkg in sorted(voted_pkgs.difference(foreign_pkgs)):
+        # voted packages must be in AUR
         pkgbase = get_pkgbase(session, pkg)
         if pkgbase in foreign_pkgs:
             continue
