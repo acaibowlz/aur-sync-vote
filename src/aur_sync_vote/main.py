@@ -8,7 +8,8 @@ from dataclasses import dataclass
 import bs4
 import keyring
 import requests
-from keyring.errors import KeyringError, NoKeyringError
+from keyring.backends import fail
+from keyring.errors import NoKeyringError
 
 SERVICE_NAME = "aur-sync-vote"
 
@@ -42,13 +43,10 @@ class Package:
 
 
 def keyring_available() -> bool:
-    try:
-        keyring.get_credential(SERVICE_NAME, None)
-        return True
-    except NoKeyringError:
+    keyring_backend = keyring.get_keyring()
+    if isinstance(keyring_backend, fail.Keyring):
         return False
-    except KeyringError:
-        return False
+    return True
 
 
 def credentials_exist() -> bool:
@@ -180,18 +178,35 @@ def cli():
         print("✅ Credentials cleared")
         sys.exit(0)
 
-    if keyring_available() and credentials_exist():
+    if args.remember and credentials_exist():
+        print("⚠️  Saved credentials exist. Overwrite? (Y/n) ", end="", flush=True)
+        resp = input()
+        if not resp or resp.lower() == "y":
+            username = input("🔐 Username: ")
+            password = getpass.getpass("🔐 Password: ")
+            save_credentials(username, password)
+            print("💾 Credentials saved")
+        elif resp.lower() == "n":
+            username, password = load_credentials()
+            print("💾 Using saved credentials")
+        else:
+            print("❌ Invalid response, exiting")
+            sys.exit(1)
+    elif args.remember and not credentials_exist():
+        username = input("🔐 Username: ")
+        password = getpass.getpass("🔐 Password: ")
+        save_credentials(username, password)
+        print("💾 Credentials saved")
+    elif credentials_exist():
         username, password = load_credentials()
+        print("💾 Using saved credentials")
     else:
         username = input("🔐 Username: ")
         password = getpass.getpass("🔐 Password: ")
-    if args.remember:
-        save_credentials(username, password)
-        print("💾 Credentials saved")
 
     session = requests.Session()
     if not login(session, username, password):
-        print("❌ Could not login")
+        print("❌ Could not login (invalid credentials)")
         sys.exit(1)
     print("ℹ️  Collecting voted packages...")
     voted_pkgs = set(p.name for p in get_voted_pkgs(session))
