@@ -4,7 +4,7 @@ requires-python = ">=3.10"
 
 [[package]]
 name = "aur-sync-vote"
-version = "0.1.0"
+version = "0.2.2"
 source = { virtual = "." }
 dependencies = [
     { name = "beautifulsoup4" },
