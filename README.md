@@ -1,5 +1,14 @@
 # aur-sync-vote
 
+![screenshot](https://raw.githubusercontent.com/acaibowlz/aur-sync-vote/refs/heads/master/.github/Screenshot%20From%202026-01-17%2016-01-12.png)
+
+## Achievements
+
+- **2026-01-17** — We are featured among the **Top 20 trending AUR packages** and **#1 AUR voting tool**.
+  Thanks to everyone who supported the project ❤️
+
+## Intro
+
 This is a fork of [aur-auto-vote](https://github.com/cryzed/bin/blob/master/aur-auto-vote), with the focus of syncing votes to currently installed AUR packages.
 
 While dropping the redundant options from the original script, `aur-sync-vote` implemented a new feature that lets you decide to sync all the AUR packages or the ones that are explicitly installed only.
