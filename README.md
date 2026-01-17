@@ -1,19 +1,19 @@
 # aur-sync-vote
 
+`aur-sync-vote` is a fork of [aur-auto-vote](https://github.com/cryzed/bin/blob/master/aur-auto-vote), focused on syncing votes with the currently installed AUR packages.
+
 ![screenshot](https://raw.githubusercontent.com/acaibowlz/aur-sync-vote/refs/heads/master/.github/Screenshot%20From%202026-01-17%2016-01-12.png)
 
 ## Achievements
 
-- **2026-01-17** — We are featured among the **Top 20 trending AUR packages** and **#1 AUR voting tool**.
-  Thanks to everyone who supported the project ❤️
+- **2026-01-17** — `aur-sync-vote` was featured among the **Top 20 trending AUR packages** and the **most popular AUR voting tool**. Thanks to everyone who supported the project ❤️
 
-## Intro
+## Features
 
-This is a fork of [aur-auto-vote](https://github.com/cryzed/bin/blob/master/aur-auto-vote), with the focus of syncing votes to currently installed AUR packages.
-
-While dropping the redundant options from the original script, `aur-sync-vote` implemented a new feature that lets you decide to sync all the AUR packages or the ones that are explicitly installed only.
-
-Beside that, `aur-sync-vote` also handles split packages better, as it will vote for the correct package base and will not attempt to unvote a split package that is not installed.
+- Securely stores login credentials via `org.freedesktop.secrets.service`
+- Syncs votes for installed AUR packages and unvotes removed ones
+- Supports syncing either all installed packages or explicitly installed ones
+- Avoids voting for non-installed split packages
 
 ## Usage
 
