@@ -118,9 +118,11 @@ def clear_credentials() -> None:
 
 def login(session: requests.Session, username: str, password: str):
     print("📦 Logging in to AUR...")
-    response = session.post(
+    response = request_with_retry(
+        session,
+        "post",
         LOGIN_URL,
-        {"user": username, "passwd": password, "next": "/"},
+        data={"user": username, "passwd": password, "next": "/"},
         headers={"referer": "https://aur.archlinux.org/login"},
     )
     soup = bs4.BeautifulSoup(response.text, "html5lib")
@@ -138,7 +140,7 @@ def get_foreign_pkgs(explicitly_installed: bool = False) -> list[str]:
 def get_voted_pkgs(session):
     offset = 0
     while True:
-        response = session.get(SEARCH_URL_TEMPLATE % offset)
+        response = request_with_retry(session, "get", SEARCH_URL_TEMPLATE % offset)
         soup = bs4.BeautifulSoup(response.text, "html5lib")
         for row in soup.select(".results > tbody > tr"):
             pkg = Package(*(c.get_text(strip=True) for c in row.select(":scope > td")[1:]))
@@ -149,7 +151,7 @@ def get_voted_pkgs(session):
 
 
 def get_pkgbase(session: requests.Session, pkg: str) -> str:
-    response = session.get(PACKAGES_URL % pkg)
+    response = request_with_retry(session, "get", PACKAGES_URL % pkg)
     soup = bs4.BeautifulSoup(response.text, "html5lib")
 
     error_page = soup.find("div", {"id": "error-page"})
@@ -173,14 +175,26 @@ def get_pkgbase(session: requests.Session, pkg: str) -> str:
 
 
 def vote_pkg(session: requests.Session, pkg: str) -> bool:
-    response = session.post(
-        VOTE_URL_TEMPLATE % pkg, {"do_Vote": "Vote for this package"}, allow_redirects=True, timeout=30
+    response = request_with_retry(
+        session,
+        "post",
+        VOTE_URL_TEMPLATE % pkg,
+        data={"do_Vote": "Vote for this package"},
+        allow_redirects=True,
+        timeout=30,
     )
     return response.status_code == requests.codes.ok
 
 
 def unvote_pkg(session: requests.Session, pkg: str) -> bool:
-    response = session.post(UNVOTE_URL_TEMPLATE % pkg, {"do_UnVote": "Remove vote"}, allow_redirects=True, timeout=30)
+    response = request_with_retry(
+        session,
+        "post",
+        UNVOTE_URL_TEMPLATE % pkg,
+        data={"do_UnVote": "Remove vote"},
+        allow_redirects=True,
+        timeout=30,
+    )
     return response.status_code == requests.codes.ok
 
 
