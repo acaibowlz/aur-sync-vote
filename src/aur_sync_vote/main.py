@@ -8,6 +8,7 @@ from importlib.metadata import version
 
 import bs4
 import keyring
+import random
 import requests
 from keyring.backends import fail
 from keyring.errors import NoKeyringError
@@ -21,6 +22,38 @@ VOTE_URL_TEMPLATE = "https://aur.archlinux.org/pkgbase/%s/vote"
 UNVOTE_URL_TEMPLATE = "https://aur.archlinux.org/pkgbase/%s/unvote"
 PACKAGES_PER_PAGE = 250
 
+# Rate Limiting settings
+MAX_RETRIES = 5
+BASE_DELAY = 1
+MAX_DELAY = 60
+
+
+def calculate_delay(attempt: int) -> float:
+    delay = BASE_DELAY * (2 ** attempt)
+    delay = min(delay, MAX_DELAY)
+    jitter = random.uniform(0.75, 1.25)
+    return delay * jitter
+
+
+def request_with_retry(
+    session: requests.Session,
+    method: str,
+    url: str,
+    max_retries: int = MAX_RETRIES,
+    **kwargs,
+) -> requests.Response:
+    for attempt in range(max_retries + 1):
+        request_method = getattr(session, method.lower())
+        response = request_method(url, **kwargs)
+
+        if response.status_code != 429:
+            return response
+
+        if attempt >= max_retries:
+            return response
+
+        delay = calculate_delay(attempt)
+        time.sleep(delay)
 
 class PackageNotFoundError(Exception):
     pass
