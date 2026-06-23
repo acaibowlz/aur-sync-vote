@@ -1,5 +1,6 @@
 import argparse
 import getpass
+import random
 import subprocess
 import sys
 import time
@@ -8,7 +9,6 @@ from importlib.metadata import version
 
 import bs4
 import keyring
-import random
 import requests
 from keyring.backends import fail
 from keyring.errors import NoKeyringError
@@ -29,7 +29,7 @@ MAX_DELAY = 60
 
 
 def calculate_delay(attempt: int) -> float:
-    delay = BASE_DELAY * (2 ** attempt)
+    delay = BASE_DELAY * (2**attempt)
     delay = min(delay, MAX_DELAY)
     jitter = random.uniform(0.75, 1.25)
     return delay * jitter
@@ -54,6 +54,7 @@ def request_with_retry(
 
         delay = calculate_delay(attempt)
         time.sleep(delay)
+
 
 class PackageNotFoundError(Exception):
     pass
