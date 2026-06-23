@@ -6,6 +6,7 @@
 
 ## Achievements
 
+- **2026-06-23** - We made to the 1st place 🎉 Thank you all for the support 🥹
 - **2026-04-06** - We have surpassed `paru`, `visual-studio-code-bin` and come to the 2nd place 🥹
 - **2026-02-21** - We got into the Top 10 🎉
 - **2026-01-17** - `aur-sync-vote` was featured among the **Top 20 trending AUR packages** and the **most popular AUR voting tool**. Thanks to everyone who supported the project ❤️
