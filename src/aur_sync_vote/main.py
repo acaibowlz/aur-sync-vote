@@ -8,6 +8,7 @@ from importlib.metadata import version
 
 import bs4
 import keyring
+import random
 import requests
 from keyring.backends import fail
 from keyring.errors import NoKeyringError
@@ -21,6 +22,38 @@ VOTE_URL_TEMPLATE = "https://aur.archlinux.org/pkgbase/%s/vote"
 UNVOTE_URL_TEMPLATE = "https://aur.archlinux.org/pkgbase/%s/unvote"
 PACKAGES_PER_PAGE = 250
 
+# Rate Limiting settings
+MAX_RETRIES = 5
+BASE_DELAY = 1
+MAX_DELAY = 60
+
+
+def calculate_delay(attempt: int) -> float:
+    delay = BASE_DELAY * (2 ** attempt)
+    delay = min(delay, MAX_DELAY)
+    jitter = random.uniform(0.75, 1.25)
+    return delay * jitter
+
+
+def request_with_retry(
+    session: requests.Session,
+    method: str,
+    url: str,
+    max_retries: int = MAX_RETRIES,
+    **kwargs,
+) -> requests.Response:
+    for attempt in range(max_retries + 1):
+        request_method = getattr(session, method.lower())
+        response = request_method(url, **kwargs)
+
+        if response.status_code != 429:
+            return response
+
+        if attempt >= max_retries:
+            return response
+
+        delay = calculate_delay(attempt)
+        time.sleep(delay)
 
 class PackageNotFoundError(Exception):
     pass
@@ -85,9 +118,11 @@ def clear_credentials() -> None:
 
 def login(session: requests.Session, username: str, password: str):
     print("📦 Logging in to AUR...")
-    response = session.post(
+    response = request_with_retry(
+        session,
+        "post",
         LOGIN_URL,
-        {"user": username, "passwd": password, "next": "/"},
+        data={"user": username, "passwd": password, "next": "/"},
         headers={"referer": "https://aur.archlinux.org/login"},
     )
     soup = bs4.BeautifulSoup(response.text, "html5lib")
@@ -105,7 +140,7 @@ def get_foreign_pkgs(explicitly_installed: bool = False) -> list[str]:
 def get_voted_pkgs(session):
     offset = 0
     while True:
-        response = session.get(SEARCH_URL_TEMPLATE % offset)
+        response = request_with_retry(session, "get", SEARCH_URL_TEMPLATE % offset)
         soup = bs4.BeautifulSoup(response.text, "html5lib")
         for row in soup.select(".results > tbody > tr"):
             pkg = Package(*(c.get_text(strip=True) for c in row.select(":scope > td")[1:]))
@@ -116,7 +151,7 @@ def get_voted_pkgs(session):
 
 
 def get_pkgbase(session: requests.Session, pkg: str) -> str:
-    response = session.get(PACKAGES_URL % pkg)
+    response = request_with_retry(session, "get", PACKAGES_URL % pkg)
     soup = bs4.BeautifulSoup(response.text, "html5lib")
 
     error_page = soup.find("div", {"id": "error-page"})
@@ -140,14 +175,26 @@ def get_pkgbase(session: requests.Session, pkg: str) -> str:
 
 
 def vote_pkg(session: requests.Session, pkg: str) -> bool:
-    response = session.post(
-        VOTE_URL_TEMPLATE % pkg, {"do_Vote": "Vote for this package"}, allow_redirects=True, timeout=30
+    response = request_with_retry(
+        session,
+        "post",
+        VOTE_URL_TEMPLATE % pkg,
+        data={"do_Vote": "Vote for this package"},
+        allow_redirects=True,
+        timeout=30,
     )
     return response.status_code == requests.codes.ok
 
 
 def unvote_pkg(session: requests.Session, pkg: str) -> bool:
-    response = session.post(UNVOTE_URL_TEMPLATE % pkg, {"do_UnVote": "Remove vote"}, allow_redirects=True, timeout=30)
+    response = request_with_retry(
+        session,
+        "post",
+        UNVOTE_URL_TEMPLATE % pkg,
+        data={"do_UnVote": "Remove vote"},
+        allow_redirects=True,
+        timeout=30,
+    )
     return response.status_code == requests.codes.ok
 
 
