@@ -231,6 +231,9 @@ def cli():
         except PackageNotFoundError:
             print("⚠️ not found in AUR, skipping")
             continue
+        except AURPageContentError:
+            print("⚠️ AUR page error, skipping")
+            continue
         if vote_pkg(session, pkgbase):
             print("✅ done")
         else:
@@ -238,7 +241,10 @@ def cli():
         time.sleep(args.delay)
     for pkg in sorted(voted_pkgs.difference(foreign_pkgs)):
         # voted packages must be in AUR
-        pkgbase = get_pkgbase(session, pkg)
+        try:
+            pkgbase = get_pkgbase(session, pkg)
+        except (PackageNotFoundError, AURPageContentError):
+            continue
         if pkgbase in foreign_pkgs:
             continue
         print("🗳️ Unvoting for package: %s... " % pkg, end="", flush=True)
