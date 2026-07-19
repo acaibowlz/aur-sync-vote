@@ -1,5 +1,11 @@
 # aur-sync-vote
 
+![PyPI Python Version](https://img.shields.io/badge/python-3.10+-3776AB?style=flat&logo=python&logoColor=white)
+![AUR Version](https://img.shields.io/aur/version/aur-sync-vote?style=flat&logo=archlinux&logoColor=white&color=1793D1)
+![AUR Votes](https://img.shields.io/aur/votes/aur-sync-vote?style=flat&logo=archlinux&logoColor=white&color=1793D1)
+![AUR Popularity](https://img.shields.io/aur/popularity/aur-sync-vote?style=flat&logo=archlinux&logoColor=white&color=1793D1)
+![GitHub License](https://img.shields.io/github/license/acaibowlz/aur-sync-vote?style=flat&color=28A745)
+
 `aur-sync-vote` is a fork of [aur-auto-vote](https://github.com/cryzed/bin/blob/master/aur-auto-vote), focused on syncing votes with the currently installed AUR packages.
 
 ![screenshot](https://raw.githubusercontent.com/acaibowlz/aur-sync-vote/refs/heads/master/.github/Screenshot%20From%202026-01-17%2016-01-12.png)
