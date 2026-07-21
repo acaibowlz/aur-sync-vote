@@ -10,10 +10,10 @@
 
 ![screenshot](https://raw.githubusercontent.com/acaibowlz/aur-sync-vote/refs/heads/master/.github/Screenshot%20From%202026-01-17%2016-01-12.png)
 
-## Achievements
+## Latest News
 
-- **2026-06-23** - We made to the 1st place 🎉 Thank you all for the support 🥹
-- **2026-04-06** - We have surpassed `paru`, `visual-studio-code-bin` and come to the 2nd place 🥹
+- **2026-06-23** - We've made it to the 1st place 🎉 Thank you all for the support 🥹
+- **2026-04-06** - We have now surpassed `paru`, `visual-studio-code-bin` and come to the 2nd place 🥹
 - **2026-02-21** - We got into the Top 10 🎉
 - **2026-01-17** - `aur-sync-vote` was featured among the **Top 20 trending AUR packages** and the **most popular AUR voting tool**. Thanks to everyone who supported the project ❤️
 
@@ -22,6 +22,7 @@
 - Securely stores login credentials via `org.freedesktop.secrets.service`
 - Syncs votes for installed AUR packages and unvotes removed ones
 - Supports syncing either all installed packages or explicitly installed ones
+- Supports local repos for AUR helpers that build into one (e.g. `aurutils`)
 - Avoids voting for non-installed split packages
 
 ## Usage
@@ -51,6 +52,19 @@ Wiping out stored credentials:
 ```
 aur-sync-vote --clear
 # or just aur-sync-vote -c
+```
+
+If your AUR helper builds packages into a local repo (e.g. `aurutils`), pacman does not report them as foreign, so they are not picked up by default. Name the repo to read the installed packages from it instead:
+
+```
+aur-sync-vote --database custom
+# or just aur-sync-vote -D custom
+```
+
+Repeat the flag to use more than one local repo:
+
+```
+aur-sync-vote -D custom -D custom-testing
 ```
 
 ## Installation

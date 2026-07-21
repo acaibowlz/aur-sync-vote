@@ -64,6 +64,10 @@ class AURPageContentError(Exception):
     pass
 
 
+class RepoNotFoundError(Exception):
+    pass
+
+
 @dataclass
 class Package:
     name: str
@@ -132,10 +136,32 @@ def login(session: requests.Session, username: str, password: str):
     )
 
 
-def get_foreign_pkgs(explicitly_installed: bool = False) -> list[str]:
-    if explicitly_installed:
-        return subprocess.check_output(("pacman", "-Qqme"), universal_newlines=True).splitlines()
-    return subprocess.check_output(("pacman", "-Qqm"), universal_newlines=True).splitlines()
+def get_installed_pkgs(explicitly_installed: bool = False) -> list[str]:
+    query = "-Qqe" if explicitly_installed else "-Qq"
+    return subprocess.check_output(("pacman", query), universal_newlines=True).splitlines()
+
+
+def get_repo_pkgs(repo: str) -> list[str]:
+    try:
+        return subprocess.check_output(
+            ("pacman", "-Slq", repo), universal_newlines=True, stderr=subprocess.DEVNULL
+        ).splitlines()
+    except subprocess.CalledProcessError:
+        raise RepoNotFoundError(repo)
+
+
+def get_aur_pkgs(explicitly_installed: bool = False, databases: list[str] | None = None) -> set[str]:
+    # Packages built into a local repo (e.g. by aurutils) are provided by that
+    # repo, so pacman no longer reports them as foreign. When databases are
+    # given they replace the foreign query entirely: anything still foreign is
+    # a stray leftover rather than a package the local repo maintains.
+    # Intersecting with the install list avoids parsing the localized
+    # "[installed]" marker of `pacman -Sl`.
+    if databases:
+        installed = set(get_installed_pkgs(explicitly_installed))
+        return set().union(*(installed.intersection(get_repo_pkgs(db)) for db in databases))
+    query = "-Qqme" if explicitly_installed else "-Qqm"
+    return set(subprocess.check_output(("pacman", query), universal_newlines=True).splitlines())
 
 
 def get_voted_pkgs(session):
@@ -214,6 +240,13 @@ def cli():
         default=0,
         help="delay between voting actions (seconds)",
     )
+    parser.add_argument(
+        "--database",
+        "-D",
+        action="append",
+        metavar="NAME",
+        help="use local repo(s) as the source of AUR packages instead of foreign packages",
+    )
     parser.add_argument("--remember", "-r", action="store_true", help="remember login credentials")
     parser.add_argument("--clear", "-c", action="store_true", help="clear stored credentials and exit")
     parser.add_argument("--version", "-v", action="store_true", help="show version and exit")
@@ -234,6 +267,18 @@ def cli():
         clear_credentials()
         print("✅ Credentials cleared")
         sys.exit(0)
+
+    # Collected before login so an unconfigured repo fails without a round trip
+    try:
+        aur_pkgs = get_aur_pkgs(explicitly_installed=args.explicit, databases=args.database)
+    except RepoNotFoundError as e:
+        print(f"❌ Repository not configured in pacman.conf: {e}")
+        sys.exit(1)
+    if not aur_pkgs:
+        print(
+            "⚠️ No installed AUR packages found.\n\nIf you install AUR packages from a local repo, pass --database NAME to include that repo."
+        )
+        sys.exit(1)
 
     if args.remember and credentials_exist():
         print("⚠️ Saved credentials exist. Overwrite? (Y/n) ", end="", flush=True)
@@ -268,11 +313,7 @@ def cli():
     print("ℹ️ Collecting voted packages...")
     voted_pkgs = set(p.name for p in get_voted_pkgs(session))
 
-    if args.explicit:
-        foreign_pkgs = set(get_foreign_pkgs(explicitly_installed=True))
-    else:
-        foreign_pkgs = set(get_foreign_pkgs())
-    for pkg in sorted(foreign_pkgs.difference(voted_pkgs)):
+    for pkg in sorted(aur_pkgs.difference(voted_pkgs)):
         print("🗳️ Voting for package: %s... " % pkg, end="", flush=True)
         try:
             pkgbase = get_pkgbase(session, pkg)
@@ -287,13 +328,13 @@ def cli():
         else:
             print("❌ failed")
         time.sleep(args.delay)
-    for pkg in sorted(voted_pkgs.difference(foreign_pkgs)):
+    for pkg in sorted(voted_pkgs.difference(aur_pkgs)):
         # voted packages must be in AUR
         try:
             pkgbase = get_pkgbase(session, pkg)
         except (PackageNotFoundError, AURPageContentError):
             continue
-        if pkgbase in foreign_pkgs:
+        if pkgbase in aur_pkgs:
             continue
         print("🗳️ Unvoting for package: %s... " % pkg, end="", flush=True)
         if unvote_pkg(session, pkgbase):
