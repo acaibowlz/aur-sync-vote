@@ -1,6 +1,6 @@
 [project]
 name = "aur-sync-vote"
-version = "0.2.4"
+version = "0.3.0"
 description = "Syncing votes with the currently installed AUR packages"
 readme = "README.md"
 requires-python = ">=3.10"
