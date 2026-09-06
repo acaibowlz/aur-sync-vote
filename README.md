@@ -67,6 +67,14 @@ Repeat the flag to use more than one local repo:
 aur-sync-vote -D custom -D custom-testing
 ```
 
+To also include foreign packages when using local repos, add `--foreign`:
+
+```
+aur-sync-vote --foreign -D custom -D custom-testing
+```
+
+`--foreign` is the default if no `--database` is specified.
+
 ## Installation
 
 ### AUR

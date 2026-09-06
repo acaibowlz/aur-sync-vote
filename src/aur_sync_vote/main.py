@@ -150,18 +150,30 @@ def get_repo_pkgs(repo: str) -> list[str]:
         raise RepoNotFoundError(repo)
 
 
-def get_aur_pkgs(explicitly_installed: bool = False, databases: list[str] | None = None) -> set[str]:
-    # Packages built into a local repo (e.g. by aurutils) are provided by that
-    # repo, so pacman no longer reports them as foreign. When databases are
-    # given they replace the foreign query entirely: anything still foreign is
-    # a stray leftover rather than a package the local repo maintains.
-    # Intersecting with the install list avoids parsing the localized
-    # "[installed]" marker of `pacman -Sl`.
-    if databases:
-        installed = set(get_installed_pkgs(explicitly_installed))
-        return set().union(*(installed.intersection(get_repo_pkgs(db)) for db in databases))
+def get_foreign_pkgs(explicitly_installed: bool = False) -> set[str]:
     query = "-Qqme" if explicitly_installed else "-Qqm"
     return set(subprocess.check_output(("pacman", query), universal_newlines=True).splitlines())
+
+
+def get_aur_pkgs(
+    explicitly_installed: bool = False,
+    databases: list[str] | None = None,
+    include_foreign: bool = False,
+) -> set[str]:
+    # Packages built into a local repo (e.g. by aurutils) are provided by that
+    # repo, so pacman no longer reports them as foreign. When databases are
+    # given they replace the foreign query entirely. --foreign adds foreign
+    # packages to that set.
+    # Intersecting with the install list avoids parsing the localized
+    # "[installed]" marker of `pacman -Sl`.
+    if not databases:
+        return get_foreign_pkgs(explicitly_installed)
+
+    installed = set(get_installed_pkgs(explicitly_installed))
+    packages = set().union(*(installed.intersection(get_repo_pkgs(db)) for db in databases))
+    if include_foreign:
+        packages.update(get_foreign_pkgs(explicitly_installed))
+    return packages
 
 
 def get_voted_pkgs(session):
@@ -247,6 +259,11 @@ def cli():
         metavar="NAME",
         help="use local repo(s) as the source of AUR packages instead of foreign packages",
     )
+    parser.add_argument(
+        "--foreign",
+        action="store_true",
+        help="include foreign packages in addition to packages from local repo(s)",
+    )
     parser.add_argument("--remember", "-r", action="store_true", help="remember login credentials")
     parser.add_argument("--clear", "-c", action="store_true", help="clear stored credentials and exit")
     parser.add_argument("--version", "-v", action="store_true", help="show version and exit")
@@ -270,7 +287,11 @@ def cli():
 
     # Collected before login so an unconfigured repo fails without a round trip
     try:
-        aur_pkgs = get_aur_pkgs(explicitly_installed=args.explicit, databases=args.database)
+        aur_pkgs = get_aur_pkgs(
+            explicitly_installed=args.explicit,
+            databases=args.database,
+            include_foreign=args.foreign,
+        )
     except RepoNotFoundError as e:
         print(f"❌ Repository not configured in pacman.conf: {e}")
         sys.exit(1)
