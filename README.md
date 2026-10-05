@@ -54,7 +54,7 @@ aur-sync-vote --clear
 # or just aur-sync-vote -c
 ```
 
-If your AUR helper builds packages into a local repo (e.g. `aurutils`), pacman does not report them as foreign, so they are not picked up by default. Name the repo to read the installed packages from it instead:
+If your AUR helper builds packages into a local repo (e.g. `aurutils`), pacman does not report them as foreign, so they are not picked up by default. Name the repo to include its installed packages alongside foreign packages:
 
 ```
 aur-sync-vote --database custom
@@ -66,6 +66,8 @@ Repeat the flag to use more than one local repo:
 ```
 aur-sync-vote -D custom -D custom-testing
 ```
+
+Foreign packages are always included. `--database` additionally includes installed packages from the named local repo(s).
 
 ## Installation
 

@@ -150,18 +150,22 @@ def get_repo_pkgs(repo: str) -> list[str]:
         raise RepoNotFoundError(repo)
 
 
-def get_aur_pkgs(explicitly_installed: bool = False, databases: list[str] | None = None) -> set[str]:
+def get_aur_pkgs(
+    explicitly_installed: bool = False, databases: list[str] | None = None
+) -> set[str]:
     # Packages built into a local repo (e.g. by aurutils) are provided by that
-    # repo, so pacman no longer reports them as foreign. When databases are
-    # given they replace the foreign query entirely: anything still foreign is
-    # a stray leftover rather than a package the local repo maintains.
-    # Intersecting with the install list avoids parsing the localized
-    # "[installed]" marker of `pacman -Sl`.
-    if databases:
-        installed = set(get_installed_pkgs(explicitly_installed))
-        return set().union(*(installed.intersection(get_repo_pkgs(db)) for db in databases))
+    # repo, so pacman no longer reports them as foreign. Add installed packages
+    # from requested local repos to the foreign package set. Intersecting with
+    # the install list avoids parsing the localized "[installed]" marker of
+    # `pacman -Sl`.
     query = "-Qqme" if explicitly_installed else "-Qqm"
-    return set(subprocess.check_output(("pacman", query), universal_newlines=True).splitlines())
+    packages = set(subprocess.check_output(("pacman", query), universal_newlines=True).splitlines())
+    if not databases:
+        return packages
+
+    installed = set(get_installed_pkgs(explicitly_installed))
+    packages.update(*(installed.intersection(get_repo_pkgs(db)) for db in databases))
+    return packages
 
 
 def get_voted_pkgs(session):
@@ -245,7 +249,7 @@ def cli():
         "-D",
         action="append",
         metavar="NAME",
-        help="use local repo(s) as the source of AUR packages instead of foreign packages",
+        help="include installed packages from local repo(s) in addition to foreign packages",
     )
     parser.add_argument("--remember", "-r", action="store_true", help="remember login credentials")
     parser.add_argument("--clear", "-c", action="store_true", help="clear stored credentials and exit")
